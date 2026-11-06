@@ -1,6 +1,7 @@
 import { registerPlaywrightTraceTool } from "./registerApplicationTools/playwrightTrace.js";
 import { registerApiContractTool } from "./registerApplicationTools/apiContract.js";
 import { registerCargoManifestTool } from "./registerApplicationTools/cargoManifest.js";
+import { registerCargoLockfileTool } from "./registerApplicationTools/cargoLockfile.js";
 import type { EvidenceMcpServer } from "./EvidenceMcpServer.js";
 
 import { registerTraceFeatureTool } from "./registerApplicationTools/traceFeature.js";
@@ -30,6 +31,7 @@ export const registerApplicationTools = (
   registerCompareEndpointsTool(server, options);
   registerApiContractTool(server, options);
   registerCargoManifestTool(server, options);
+  registerCargoLockfileTool(server, options);
   registerPlaywrightTraceTool(server, options);
   registerCompareSourceToBundleTool(server, options);
   registerCompareJavaScriptExportShapesTool(server, options);

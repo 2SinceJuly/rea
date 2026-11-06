@@ -52,3 +52,37 @@ refused for its representation rather than silently truncated.
 
 The manifest must be UTF-8 TOML; duplicate tables and malformed text are typed
 `invalid_format` input failures, not partial inventories.
+
+## Offline Cargo lockfile records
+
+`inspect_cargo_lockfile` reads one local `Cargo.lock`. It inventories the
+packages Cargo already resolved and wrote, without a manifest read, a registry
+request, a checksum verification or any build. Each record keeps what the
+lockfile states:
+
+| fact               | meaning                                                   |
+| ------------------ | --------------------------------------------------------- |
+| `package_id`       | source-scoped identity, including the lockfile digest     |
+| `name` / `version` | the resolved identity Cargo recorded                      |
+| `source`           | `registry`, `git`, `path`, `local` or `unknown`           |
+| `source_detail`    | the source string with transport credentials removed      |
+| `checksum`         | the recorded digest, or `null` when the lockfile has none |
+| `replaces`         | Cargo's `replace` field for a patched package             |
+| `dependencies`     | the reference text exactly as written                     |
+| `ledger_pointer`   | JSON Pointer to the `[[package]]` entry                   |
+
+A package with no `source` is reported as `local`, not as an unknown registry
+package. Git fragment parameters such as `?branch=main#<sha>` stay attached to
+the recorded URL; only transport userinfo is removed. `[metadata]` is opaque to
+Cargo and is retained as encoded JSON rather than interpreted.
+
+Dependency references are resolved only within this file: a reference that names
+no record, or a bare name that matches several records, is an
+`unresolved-dependency-reference` or `ambiguous-dependency-reference` diagnostic
+instead of a guessed edge. `source_coverage` states that `manifests`,
+`resolution` and `registry_access` were not attempted, and its `status` is
+`partial` whenever a diagnostic was recorded.
+
+The lockfile version must be 1-4, or absent for the original format; any other
+version is a typed `invalid_format` input failure rather than a partial
+inventory.

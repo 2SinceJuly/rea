@@ -594,6 +594,18 @@ tables retain their declared condition unevaluated. See
 [offline Cargo manifests](cargo-manifests.md) for identities, source pointers
 and resource bounds.
 
+## Offline Cargo lockfile records
+
+`inspect_cargo_lockfile` reads one local `Cargo.lock` and inventories the
+packages Cargo already resolved: registry, Git, path and local records stay
+distinct, Git fragment parameters are retained with transport credentials
+removed, and checksums plus patch replacements are reported as recorded. A
+dependency reference that names no record or several records is a diagnostic
+rather than a guessed edge. Manifests and vendor outputs are not read, and no
+registry access or re-resolution happens. See
+[offline Cargo manifests](cargo-manifests.md) for identities, ledger pointers
+and resource bounds.
+
 ## Retained application Evidence inputs
 
 `analyze_javascript_application`, `inspect_binary_layout`, `inspect_artifact`,
