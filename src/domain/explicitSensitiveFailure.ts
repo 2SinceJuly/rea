@@ -48,13 +48,6 @@ const excludeSnapshotIdentity = (
   return { ...snapshot, path, admitted_sha256 };
 };
 
-/** Keep a real JSON-pointer ancestor when a property identity is explicitly excluded. */
-export const redactExplicitPointer = (
-  pointer: string,
-  values: readonly string[],
-): string =>
-  redactSensitivePointer(pointer, (value) => redactExplicitText(value, values));
-
 const redactSensitivePointer = (
   pointer: string,
   text: (value: string) => string,
@@ -271,11 +264,16 @@ const redactFailure = (
       error.issues.map(issueProjection),
     );
   if (error instanceof AnalysisOutputError)
-    return new AnalysisOutputError(
-      error.operation,
-      text(error.reason),
-      context,
-    );
+    return new AnalysisOutputError(error.operation, text(error.reason), {
+      ...context,
+      ...(error.userMessage === undefined
+        ? {}
+        : { userMessage: text(error.userMessage) }),
+      ...(error.remediationAction === undefined
+        ? {}
+        : { remediationAction: text(error.remediationAction) }),
+      cleanupOnly: error.cleanupOnly,
+    });
   if (error instanceof AnalysisCapabilityUnavailableError)
     return new AnalysisCapabilityUnavailableError(
       error.providerId,
@@ -286,6 +284,14 @@ const redactFailure = (
         ...(error.userMessage === undefined
           ? {}
           : { userMessage: text(error.userMessage) }),
+        ...(error.remediationAction === undefined
+          ? {}
+          : { remediationAction: text(error.remediationAction) }),
+        ...(error.fallbackRemediationAction === undefined
+          ? {}
+          : {
+              fallbackRemediationAction: text(error.fallbackRemediationAction),
+            }),
         ...(error.siblingOperations === undefined
           ? {}
           : { siblingOperations: error.siblingOperations }),

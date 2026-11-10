@@ -1,3 +1,6 @@
+import { webSourceLocationViewRequestSchema } from "./webSourceLocationView.js";
+import { nativeProcedureReferencesViewRequestSchema } from "./nativeProcedureReferencesView.js";
+import { graphqlContractViewRequestSchema } from "../apiContract/graphqlContractQuery.js";
 import { playwrightTraceViewRequestSchema } from "../playwrightTrace/playwrightTraceQuery.js";
 import { apiContractViewRequestSchema } from "../apiContract/apiContractQuery.js";
 import {
@@ -62,11 +65,23 @@ import {
   pageViewSchema,
   summaryViewSchema,
 } from "./analysisViewShape.js";
+export const recordedArrayViewSchema = z.strictObject({
+  kind: z.literal("recorded-array"),
+  path: z
+    .array(z.string())
+    .describe(
+      "Exact object-member path from the parent Evidence raw_result to the recorded array. The provider defines the values and their coverage.",
+    ),
+  offset: z.int().nonnegative().default(0),
+  limit: z.int().positive().default(64),
+});
+
 /** Caller-selected projection of already completed analysis Evidence. */
 export const analysisViewRequestSchema = z.discriminatedUnion("kind", [
   nativeInstructionReferencesRequestSchema,
   nativeObservationViewRequestSchema,
   nativeContextViewRequestSchema,
+  recordedArrayViewSchema,
   devicetreeViewRequestSchema,
   erlangBeamViewRequestSchema,
   pythonPycViewRequestSchema,
@@ -77,11 +92,13 @@ export const analysisViewRequestSchema = z.discriminatedUnion("kind", [
   sourceToBundleViewRequestSchema,
   endpointComparisonViewRequestSchema,
   apiContractViewRequestSchema,
+  graphqlContractViewRequestSchema,
   playwrightTraceViewRequestSchema,
   featureTraceViewRequestSchema,
   nativeFeatureTraceViewRequestSchema,
   batchDecompileViewRequestSchema,
   summaryViewSchema,
+  webSourceLocationViewRequestSchema,
   goBinaryViewRequestSchema,
   rustBinaryViewRequestSchema,
   desktopViewRequestSchema,
@@ -92,6 +109,7 @@ export const analysisViewRequestSchema = z.discriminatedUnion("kind", [
   javascriptFactsViewRequestSchema,
   nativeViewSchema,
   nativeInventoryViewRequestSchema,
+  nativeProcedureReferencesViewRequestSchema,
   nativeLoadImageViewRequestSchema,
   artifactInventoryViewRequestSchema,
   wasmViewRequestSchema,
