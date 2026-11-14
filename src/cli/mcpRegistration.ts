@@ -42,6 +42,7 @@ import { PRODUCT_IDENTITY } from "../identity.js";
 import { createCliResultOutput } from "./cliResultOutput.js";
 import { withCommandCancellation } from "./commandCancellation.js";
 import type { CliInstance } from "./types.js";
+import { ownCliProcessResource } from "./cliResources.js";
 
 let retainedResources: ArtifactResourceScope | undefined;
 
@@ -52,6 +53,8 @@ export const closeCliMcpRegistrationResources = async (): Promise<void> => {
   await resources.close();
   if (retainedResources === resources) retainedResources = undefined;
 };
+
+ownCliProcessResource("mcp-registration", closeCliMcpRegistrationResources);
 
 type ServeOptions = NonNullable<Parameters<CliInstance["serve"]>[1]>;
 interface RegistrationRequest {
