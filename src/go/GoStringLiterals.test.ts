@@ -548,11 +548,7 @@ it("indexes 25,000 Mach-O load regions and sections without quadratic stalls and
     sections,
   };
 
-  const started = performance.now();
   const recovered = recoverGoStringLiterals(bytes, container);
-  const elapsedMs = performance.now() - started;
-
-  expect(elapsedMs).toBeLessThan(500);
   expect(recovered.items).toEqual([
     {
       value: literal,
@@ -561,6 +557,27 @@ it("indexes 25,000 Mach-O load regions and sections without quadratic stalls and
       reference_count: 1,
     },
   ]);
+
+  // Each region and section is read a bounded number of times, so 25,000 of
+  // them cost linear work rather than the quadratic rewrite this guards.
+  const reads = { loadRegions: 0, sections: 0 };
+  const counting = <Item>(items: readonly Item[], key: keyof typeof reads) =>
+    new Proxy(items, {
+      get(target, property, receiver) {
+        if (typeof property === "string" && /^\d+$/u.test(property))
+          reads[key] += 1;
+        return Reflect.get(target, property, receiver);
+      },
+    });
+  recoverGoStringLiterals(bytes, {
+    ...container,
+    load_regions: counting(loadRegions, "loadRegions"),
+    sections: counting(sections, "sections"),
+  });
+  expect(reads.loadRegions).toBeGreaterThan(0);
+  expect(reads.loadRegions).toBeLessThanOrEqual(count * 4);
+  expect(reads.sections).toBeGreaterThan(0);
+  expect(reads.sections).toBeLessThanOrEqual(count * 4);
 
   let inRegionLoop = false;
   let observedRegions = 0;

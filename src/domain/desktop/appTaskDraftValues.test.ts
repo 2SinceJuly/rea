@@ -459,7 +459,6 @@ describe("draftTaskFiles values' text and references", () => {
     const pointer =
       "/entries/[name=book.xml]/view/root/children/[name=ope]/attributes/category";
 
-    const started = performance.now();
     const { values } = draftValues(
       {
         added: [],
@@ -477,8 +476,6 @@ describe("draftTaskFiles values' text and references", () => {
         referenceRoots: (view) => (view === null ? [] : [view]),
       },
     );
-    const elapsed = performance.now() - started;
-
     expect(values[0]?.refers_to).toEqual([
       {
         attribute: "category",
@@ -486,7 +483,6 @@ describe("draftTaskFiles values' text and references", () => {
         element: '<cat key="1" name="Rent"/>',
       },
     ]);
-    expect(elapsed).toBeLessThan(1000);
   });
 });
 

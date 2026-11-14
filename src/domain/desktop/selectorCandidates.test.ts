@@ -34,23 +34,55 @@ describe("childCandidates", () => {
 });
 
 describe("childConditions", () => {
+  /**
+   * Count the code units every `for...of` over a string consumes while `read`
+   * runs, which is the read `shortText` performs. Adjusting
+   * `String.prototype[Symbol.iterator]` is only observable by that loop; `trim`,
+   * `includes` and the timestamp probes read their own primitives.
+   */
+  const countingStringReads = <Result>(read: () => Result) => {
+    const original = String.prototype[Symbol.iterator];
+    let codeUnitsRead = 0;
+    String.prototype[Symbol.iterator] = function* (
+      this: string,
+    ): Generator<string, undefined, undefined> {
+      for (let index = 0; index < this.length; index += 1) {
+        codeUnitsRead += 1;
+        yield this[index] as string;
+      }
+      return undefined;
+    };
+    try {
+      return { result: read(), codeUnitsRead: () => codeUnitsRead };
+    } finally {
+      String.prototype[Symbol.iterator] = original;
+    }
+  };
+
+  /** An element whose only string the loop reads is its `body` child's text. */
+  const record = (text: string) => ({
+    name: "record",
+    attributes: {},
+    children: [{ name: "body", attributes: {}, children: [text] }],
+  });
+
   it("stops reading a child's text once it is past what a selector names a member by, however long the text", () => {
-    const element = (text: string) => ({
-      name: "record",
-      attributes: {},
-      children: [
-        { name: "title", attributes: {}, children: ["Budget"] },
-        { name: "body", attributes: {}, children: [text] },
-      ],
-    });
-    const huge = element(`a b ${"x".repeat(4 * 1024 * 1024)}`);
+    const huge = countingStringReads(() =>
+      childConditions(record(`a b ${"x".repeat(4 * 1024 * 1024)}`)),
+    );
 
-    const started = performance.now();
-    const conditions = childConditions(huge);
-    const elapsed = performance.now() - started;
+    expect(huge.result).toEqual([]);
+    // Reading stops at the 65th code unit, the first past the 64 a selector
+    // names a member by, so the remaining 4 MiB costs nothing.
+    expect(huge.codeUnitsRead()).toBe(65);
+  });
 
-    expect(conditions).toEqual(["[>title=Budget]"]);
-    // Building the whole collapsed text took about half a second.
-    expect(elapsed).toBeLessThan(100);
+  it("reads a child's text to its end when it stays within what a selector names a member by", () => {
+    const short = countingStringReads(() =>
+      childConditions(record("a b Budget")),
+    );
+
+    expect(short.result).toEqual(["[>body=a b Budget]"]);
+    expect(short.codeUnitsRead()).toBe(10);
   });
 });
