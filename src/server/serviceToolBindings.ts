@@ -1074,6 +1074,20 @@ const SERVICE_TOOL_BINDINGS = {
             await inspectNtfsJournalEvidence(input, resources, signal),
           ),
       },
+      inspect_warc_archive: {
+        admission: "sdk",
+        workflow: async (input, { signal }) => {
+          const { inspectWarcArchiveEvidence } = await import(
+            "../application/warcArchive/WarcArchiveService.js"
+          );
+          const inspected = await inspectWarcArchiveEvidence(input, resources, {
+            signal,
+          });
+          return inspected.ok
+            ? inspectionExecution(ok(inspected.value.evidence))
+            : inspected;
+        },
+      },
       inspect_playwright_trace: {
         admission: "sdk",
         view: requestedView,

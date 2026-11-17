@@ -1,3 +1,4 @@
+import { createMcpSchemaValidation } from "../../fixtures/mcpSchemaValidation.js";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
@@ -25,7 +26,10 @@ it("withholds archived HTTP credentials from the reply and retained Evidence", a
     throw new Error("No native provider");
   });
   const server = createServer({ kind: "session", session });
-  const client = new Client({ name: "warc-credential-test", version: "1" });
+  const client = new Client(
+    { name: "warc-credential-test", version: "1" },
+    { jsonSchemaValidator: createMcpSchemaValidation() },
+  );
   const [clientTransport, serverTransport] =
     InMemoryTransport.createLinkedPair();
   onTestFinished(async () => {

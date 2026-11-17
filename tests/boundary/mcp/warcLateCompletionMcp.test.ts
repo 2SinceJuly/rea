@@ -1,3 +1,4 @@
+import { createMcpSchemaValidation } from "../../fixtures/mcpSchemaValidation.js";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
@@ -28,7 +29,10 @@ it("retains a completed WARC inventory when the MCP request is cancelled before 
     throw new Error("No native provider");
   });
   const server = createServer({ kind: "session", session });
-  const client = new Client({ name: "warc-late-cancellation", version: "1" });
+  const client = new Client(
+    { name: "warc-late-cancellation", version: "1" },
+    { jsonSchemaValidator: createMcpSchemaValidation() },
+  );
   const [clientTransport, serverTransport] =
     InMemoryTransport.createLinkedPair();
   const controller = new AbortController();

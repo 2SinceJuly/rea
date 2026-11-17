@@ -1,20 +1,25 @@
 import { isAbsolute } from "node:path";
+
+
+
+
+
 import {
+  ArtifactReaderFailure,
   artifactFileCancellationCause,
   artifactFilePrimaryFacts,
-} from "../../resources/ArtifactFileOperation.js";
-import { ArtifactReaderFailure } from "../../resources/ArtifactReader.js";
-import type { ArtifactResourceScope } from "../../resources/ArtifactResourceScope.js";
-import { readStableArtifact } from "../../resources/readStableArtifact.js";
-import {
   projectStableArtifactFailure,
+  readStableArtifact,
   stableArtifactInputRecovery,
-} from "../../resources/StableArtifactFailure.js";
+  type ArtifactResourceScope,
+} from "../../resources/index.js";
 import type { AnalysisError } from "../../domain/analysisErrorBase.js";
+import { fixedAllowanceOptions } from "../../domain/fixedAllowanceRemediation.js";
 import {
   AnalysisAccessDeniedError,
   AnalysisArtifactChangedError,
-  AnalysisCancelledError,
+  carriedReason,
+  cancelledBy,
   AnalysisInputError,
   AnalysisResourceConstraintError,
 } from "../../domain/analysisErrorCore.js";
@@ -66,9 +71,10 @@ const readFailure = (
     cause instanceof ArtifactReaderFailure
   ) {
     if (cause.reason === "cancelled")
-      return new AnalysisCancelledError(operation, {
-        cause: artifactFileCancellationCause(cause),
-      });
+      return cancelledBy(
+        operation,
+        carriedReason(artifactFileCancellationCause(cause)),
+      );
     if (cause.reason === "integrity")
       return new AnalysisArtifactChangedError(
         operation,
@@ -79,14 +85,15 @@ const readFailure = (
     if (cause.reason === "limit")
       return new AnalysisResourceConstraintError(
         operation,
-        cause.boundary ?? "file-size",
+        "file-size",
         cause.message,
         { max_file_bytes: input.max_file_bytes },
         {
           cause,
-          retryable: false,
-          remediationAction:
-            "Select an archive within max_file_bytes; reply paging does not change this file admission.",
+          ...fixedAllowanceOptions("The WARC archive file allowance", "input", {
+            limit: input.max_file_bytes,
+            unit: "bytes",
+          }),
         },
       );
     if (cause.reason === "path" || cause.reason === "format")

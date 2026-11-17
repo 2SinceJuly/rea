@@ -10,7 +10,7 @@ export const inspectWarcArchiveInputSchema = z.strictObject({
   path: localPathStringSchema.describe(
     "Absolute path to one local WARC or WARC.gz file",
   ),
-  format: z.literal("warc").default("warc"),
+  format: z.enum(["warc"]).default("warc"),
   max_file_bytes: z
     .int()
     .positive()
