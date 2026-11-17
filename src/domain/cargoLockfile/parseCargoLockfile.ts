@@ -3,7 +3,10 @@ import {
   AnalysisInputError,
   AnalysisResourceConstraintError,
 } from "../analysisErrorCore.js";
+import { Budget } from "../budget.js";
 import { digestCanonicalValue } from "../canonicalDigest.js";
+import { fixedAllowanceOptions } from "../fixedAllowanceRemediation.js";
+import { isRecord } from "../../kernel/isRecord.js";
 import { parseRecordedTransportUrl } from "../recordedTransportUrl.js";
 import { err, ok, type Result } from "../result.js";
 import {
@@ -17,9 +20,7 @@ import {
 type DiagnosticCode = CargoLockfile["diagnostics"][number]["code"];
 
 const record = (value: unknown): Record<string, unknown> | undefined =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : undefined;
+  isRecord(value) ? value : undefined;
 const pointerPart = (value: string): string =>
   value.replaceAll("~", "~0").replaceAll("/", "~1");
 const identity = (prefix: string, facts: unknown) =>
@@ -111,7 +112,7 @@ class CargoLockInventory {
   readonly packages: CargoLockedPackage[] = [];
   readonly metadata: CargoLockfile["metadata"] = [];
   readonly diagnostics: CargoLockfile["diagnostics"] = [];
-  #retainedBytes = 0;
+  #retained = new Budget(CARGO_LOCKFILE_FACT_BYTES);
 
   constructor(readonly artifact: CargoLockfileArtifact) {}
 
@@ -125,22 +126,22 @@ class CargoLockInventory {
         typeof value === "string"
           ? expandedBytes(value)
           : value.reduce((total, item) => total + expandedBytes(item), 0);
-    this.#retainedBytes += bytes;
-    return this.#retainedBytes <= CARGO_LOCKFILE_FACT_BYTES
-      ? ok(undefined)
-      : err(
-          new AnalysisResourceConstraintError(
-            CARGO_LOCKFILE_OPERATION,
-            "memory",
-            "Cargo lockfile records exceed the retained-facts representation allowance.",
-            { representation_bytes: CARGO_LOCKFILE_FACT_BYTES },
-            {
-              retryable: false,
-              remediationAction:
-                "Select a smaller complete lockfile; reply paging does not increase the parser's retained-facts allowance.",
-            },
+    if (this.#retained.tryCharge(bytes)) return ok(undefined);
+    return err(
+      new AnalysisResourceConstraintError(
+        CARGO_LOCKFILE_OPERATION,
+        "memory",
+        "Cargo lockfile records exceed the retained-facts representation allowance.",
+        { representation_bytes: CARGO_LOCKFILE_FACT_BYTES },
+        {
+          ...fixedAllowanceOptions(
+            "The Cargo lockfile retained-facts allowance",
+            "parser",
+            { limit: CARGO_LOCKFILE_FACT_BYTES, unit: "bytes" },
           ),
-        );
+        },
+      ),
+    );
   }
 
   diagnostic(

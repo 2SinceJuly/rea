@@ -1,5 +1,7 @@
 import { isAbsolute } from "node:path";
-import type { ArtifactResourceScope } from "../../artifacts/ArtifactResourceScope.js";
+
+import type { ArtifactResourceScope } from "../../resources/index.js";
+
 import type { AnalysisError } from "../../domain/analysisErrorBase.js";
 import { AnalysisInputError } from "../../domain/analysisErrorCore.js";
 import { createEvidence, type Evidence } from "../../domain/evidence.js";

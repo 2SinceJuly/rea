@@ -1,25 +1,28 @@
 import { constants } from "node:buffer";
 import { parse as parseToml } from "smol-toml";
-import type { ArtifactResourceScope } from "../../artifacts/ArtifactResourceScope.js";
-import { ArtifactReaderFailure } from "../../artifacts/ArtifactReader.js";
+
 import {
+  ArtifactReaderFailure,
   artifactFileCancellationCause,
   artifactFilePrimaryFacts,
-} from "../../artifacts/ArtifactFileOperation.js";
-import { readStableArtifact } from "../../artifacts/readStableArtifact.js";
-import {
+  readStableArtifact,
   projectStableArtifactFailure,
   stableArtifactInputRecovery,
-} from "../../artifacts/StableArtifactFailure.js";
+  type ArtifactResourceScope,
+} from "../../resources/index.js";
 import type { AnalysisError } from "../../domain/analysisErrorBase.js";
 import {
   AnalysisAccessDeniedError,
   AnalysisArtifactChangedError,
-  AnalysisCancelledError,
   AnalysisInputError,
   AnalysisResourceConstraintError,
+  carriedReason,
+  cancelledBy,
 } from "../../domain/analysisErrorCore.js";
+import { fixedAllowanceOptions } from "../../domain/fixedAllowanceRemediation.js";
 import { ArtifactOperationError } from "../../domain/artifactOperationError.js";
+import { decodeStrictUtf8 } from "../../domain/strictUtf8.js";
+import { classifyProviderFailure, type ProviderFailureDialect } from "../../providers/classifyProviderFailure.js";
 import { err, ok, type Result } from "../../domain/result.js";
 
 /** The operations that admit a UTF-8 TOML artifact for offline Cargo inventory. */
@@ -27,7 +30,6 @@ export type CargoTomlOperation =
   | typeof import("../../domain/cargoManifest/cargoManifest.js").CARGO_MANIFEST_OPERATION
   | typeof import("../../domain/cargoLockfile/cargoLockfile.js").CARGO_LOCKFILE_OPERATION;
 
-const UTF8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 
 const inputFailure = (
   operation: CargoTomlOperation,
@@ -45,54 +47,81 @@ const inputFailure = (
     [{ path: ["path"], reason: "invalid_format", message }],
   );
 
-/** Keep the reader's typed reasons instead of flattening every failure into "io". */
+/**
+ * Cargo's dialect for the shared provider failure classifier: the reader's
+ * typed reasons survive instead of flattening into "io".
+ */
+const cargoFailureDialect = (
+  operation: CargoTomlOperation,
+  path: string,
+  maxFileBytes: number,
+): ProviderFailureDialect => ({
+  providerId: operation,
+  operation,
+  recognise: (cause) =>
+    cause instanceof ArtifactReaderFailure
+      ? cargoReaderFailure(operation, cause, path, maxFileBytes)
+      : undefined,
+  unclassified: (cause) =>
+    new ArtifactOperationError(
+      operation,
+      "io",
+      undefined,
+      "TOML artifact read failed.",
+      { cause },
+    ),
+});
+
+/** Map one reader failure onto the typed error Cargo reports for it. */
+const cargoReaderFailure = (
+  operation: CargoTomlOperation,
+  cause: ArtifactReaderFailure,
+  path: string,
+  maxFileBytes: number,
+): AnalysisError | undefined => {
+  if (cause.reason === "cancelled")
+    return cancelledBy(
+      operation,
+      carriedReason(artifactFileCancellationCause(cause)),
+    );
+  if (cause.reason === "integrity")
+    return new AnalysisArtifactChangedError(operation, path, cause.message, {
+      cause,
+    });
+  if (cause.reason === "limit")
+    return new AnalysisResourceConstraintError(
+      operation,
+      "file-size",
+      cause.message,
+      { max_file_bytes: maxFileBytes },
+      {
+        cause,
+        ...fixedAllowanceOptions("The Cargo TOML file allowance", "input", {
+          limit: maxFileBytes,
+          unit: "bytes",
+        }),
+      },
+    );
+  if (cause.reason === "path" || cause.reason === "format")
+    return inputFailure(operation, cause.message, cause);
+  return undefined;
+};
+
 const readFailure = (
   operation: CargoTomlOperation,
   failure: unknown,
   path: string,
   maxFileBytes: number,
 ): AnalysisError => {
-  const { cause, origin } = artifactFilePrimaryFacts(failure);
-  if (
-    origin === "owned-or-classified" &&
-    cause instanceof ArtifactReaderFailure
-  ) {
-    if (cause.reason === "cancelled")
-      return new AnalysisCancelledError(operation, {
-        cause: artifactFileCancellationCause(cause),
-      });
-    if (cause.reason === "integrity")
-      return new AnalysisArtifactChangedError(operation, path, cause.message, {
-        cause,
-      });
-    if (cause.reason === "limit")
-      return new AnalysisResourceConstraintError(
-        operation,
-        cause.boundary ?? "file-size",
-        cause.message,
-        { max_file_bytes: maxFileBytes },
-        {
-          cause,
-          retryable: false,
-          remediationAction:
-            "Select a file within max_file_bytes; reply paging does not change this file admission.",
-        },
-      );
-    if (cause.reason === "path" || cause.reason === "format")
-      return inputFailure(operation, cause.message, cause);
-  }
-  if (cause instanceof Error && "code" in cause) {
+  const { cause } = artifactFilePrimaryFacts(failure);
+  if (cause instanceof Error && "code" in cause)
     if (cause.code === "EACCES" || cause.code === "EPERM")
       return new AnalysisAccessDeniedError(operation, path, cause.code, {
         cause,
       });
-  }
-  return new ArtifactOperationError(
-    operation,
-    "io",
-    undefined,
-    "TOML artifact read failed.",
-    { cause: failure },
+  return classifyProviderFailure(
+    cause,
+    cargoFailureDialect(operation, path, maxFileBytes),
   );
 };
 
@@ -146,7 +175,7 @@ export const decodeCargoToml = (
   // one replacement character that re-encodes to the same length. Decode fatally.
   let text: string;
   try {
-    text = UTF8.decode(bytes);
+    text = decodeStrictUtf8(bytes, "strip-signature");
   } catch (cause: unknown) {
     return err(
       inputFailure(
