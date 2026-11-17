@@ -1,25 +1,24 @@
 import { isAbsolute } from "node:path";
 import {
+  ArtifactFileSource,
+  ArtifactReaderFailure,
+  ZipArtifactReader,
   artifactFileCancellationCause,
   artifactFilePrimaryFacts,
   bindArtifactFileCleanup,
-} from "../../artifacts/ArtifactFileOperation.js";
-import { ArtifactReaderFailure } from "../../artifacts/ArtifactReader.js";
-import type { ArtifactResourceScope } from "../../artifacts/ArtifactResourceScope.js";
-import { ArtifactFileSource } from "../../artifacts/ArtifactFileSource.js";
-import { hashReadableToCompletion } from "../../artifacts/ArtifactHash.js";
-import { readFileHandleChunks } from "../../filesystem/readFileHandleChunks.js";
-import { ProviderCleanupError } from "../../domain/providerCleanupError.js";
-import { ZipArtifactReader } from "../../artifacts/ZipArtifactReader.js";
-import {
+  digestReadableToCompletion,
   projectStableArtifactFailure,
   stableArtifactInputRecovery,
-} from "../../artifacts/StableArtifactFailure.js";
+  type ArtifactResourceScope,
+} from "../../resources/index.js";
+import { readFileHandleChunks } from "../../filesystem/readFileHandleChunks.js";
+import { ProviderCleanupError } from "../../domain/providerCleanupError.js";
 import { AnalysisError } from "../../domain/analysisErrorBase.js";
 import {
   AnalysisAccessDeniedError,
   AnalysisArtifactChangedError,
-  AnalysisCancelledError,
+  carriedReason,
+  cancelledBy,
   AnalysisInputError,
   AnalysisResourceConstraintError,
 } from "../../domain/analysisErrorCore.js";
@@ -91,9 +90,10 @@ const readFailure = (
     cause instanceof ArtifactReaderFailure
   ) {
     if (cause.reason === "cancelled")
-      return new AnalysisCancelledError(operation, {
-        cause: artifactFileCancellationCause(cause),
-      });
+      return cancelledBy(
+        operation,
+        carriedReason(artifactFileCancellationCause(cause)),
+      );
     if (cause.reason === "integrity")
       return new AnalysisArtifactChangedError(
         operation,
@@ -302,7 +302,7 @@ export const inspectNugetPackageEvidence = async (
             `Selected artifact exceeds ${String(input.max_file_bytes)} bytes: ${input.path}`,
             { boundary: "file-size" },
           );
-        const hashed = await hashReadableToCompletion(
+        const hashed = await digestReadableToCompletion(
           readFileHandleChunks(admittedFile.handle, {
             end: input.max_file_bytes,
             signal: options.signal,
@@ -326,6 +326,7 @@ export const inspectNugetPackageEvidence = async (
           throw new ArtifactReaderFailure(
             "integrity",
             `NuGet package changed during hashing: ${input.path}`,
+            { integrityCheck: "container-identity" },
           );
         artifact = {
           path: input.path,

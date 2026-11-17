@@ -109,8 +109,7 @@ export const projectNugetPackageView = (
     artifact: { path: report.artifact.path, sha256: report.artifact.sha256 },
     summary: {
       artifact: report.artifact,
-      nuspecs: report.nuspecs
-        .slice(0, VIEW_NUSPEC_LIMIT)
+      nuspecs: report.nuspecs.slice(0, VIEW_NUSPEC_LIMIT) // sample-cap: nuspec_count reports the complete list.
         .map(
           ({
             dependency_groups: _groups,
@@ -125,7 +124,8 @@ export const projectNugetPackageView = (
       assemblies: report.summary.assemblies,
       diagnostics:
         report.diagnostics.length > VIEW_DIAGNOSTIC_LIMIT
-          ? report.diagnostics.slice(0, VIEW_DIAGNOSTIC_LIMIT)
+          ? // sample-cap: diagnostics_omitted reports the complete count.
+            report.diagnostics.slice(0, VIEW_DIAGNOSTIC_LIMIT) // sample-cap: diagnostics_omitted reports the complete count.
           : report.diagnostics,
       diagnostics_omitted: Math.max(
         0,
@@ -133,7 +133,7 @@ export const projectNugetPackageView = (
       ),
       source_coverage: report.source_coverage,
     },
-    coverage: completeWithinViewCoverage(1, 1),
+    coverage: completeWithinViewCoverage(1),
     limitations: [...parent.limitations].sort(),
     unknowns:
       report.source_coverage.status === "partial"

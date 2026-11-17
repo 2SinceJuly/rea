@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { sha256Hex } from "../../kernel/sha256Hex.js";
 import type { Document, Element } from "@xmldom/xmldom";
 import { sanitizeBrowserUrl } from "../browserObservation.js";
 import { parseXmlDocument } from "../xmlDocument.js";
@@ -14,9 +14,7 @@ import {
 } from "./nugetPackage.js";
 
 const digest = (prefix: string, ...parts: readonly (string | number)[]) =>
-  `${prefix}_${createHash("sha256")
-    .update(parts.map(String).join("\u0000"))
-    .digest("hex")}`;
+  `${prefix}_${sha256Hex(parts.map(String).join("\u0000"))}`;
 
 /** One admitted archive member, as the ZIP directory states it. */
 export interface NugetArchiveMember {
@@ -341,7 +339,7 @@ const nuspecOf = (
   if (!parsed.ok) {
     budget.add(
       member.path,
-      parsed.error.reason === "doctype"
+      parsed.error.kind === "unsupported"
         ? "unsupported-nuspec-doctype"
         : "invalid-nuspec",
       parsed.error.message,

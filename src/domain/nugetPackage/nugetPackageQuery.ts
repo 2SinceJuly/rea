@@ -9,7 +9,7 @@ export const inspectNugetPackageInputSchema = z.strictObject({
   path: absoluteLocalPathStringSchema.describe(
     "Absolute path to one local NuGet package (.nupkg) file",
   ),
-  format: z.literal("nupkg").default("nupkg"),
+  format: z.enum(["nupkg"]).default("nupkg"),
   max_file_bytes: z
     .int()
     .positive()
