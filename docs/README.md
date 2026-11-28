@@ -10,6 +10,7 @@ The [REA website](https://rea.tools/) has worked examples and product pages.
 - [Client configuration and troubleshooting](getting-started/client-configuration.md)
 - [CLI and Evidence](getting-started/cli.md)
 - [Guided MCP prompts and completion](getting-started/mcp-prompts.md)
+- [Temporary MCP connections](getting-started/temporary-mcp-connections.md)
 
 ## Desktop applications
 

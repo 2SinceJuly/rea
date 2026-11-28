@@ -28,6 +28,11 @@ export const documentationSections = [
         source: "getting-started/mcp-prompts.md",
         route: "/mcp-prompts",
       },
+      {
+        text: "Temporary MCP connections",
+        source: "getting-started/temporary-mcp-connections.md",
+        route: "/temporary-mcp-connections",
+      },
     ],
   },
   {
